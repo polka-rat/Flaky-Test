@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=69.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "flaky-test-diagnoser"
+version = "0.1.0"
+description = "A closed-loop agent for diagnosing and verifying flaky Python test fixes."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "anthropic==0.40.0",
+]
+
+[project.scripts]
+flaky-agent = "flaky_agent.cli:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+
+[tool.setuptools.packages.find]
+include = ["flaky_agent*"]
