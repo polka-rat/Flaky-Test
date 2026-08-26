@@ -13,11 +13,11 @@ dependencies = [
 ]
 
 [project.scripts]
-flaky-agent = "flaky_agent.cli:main"
+flaky-agent = "Diagnoser.cli:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
 
 [tool.setuptools.packages.find]
-include = ["flaky_agent*"]
+include = ["Diagnoser*"]

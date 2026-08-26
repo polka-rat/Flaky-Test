@@ -6,7 +6,7 @@ from collections import Counter
 from dataclasses import dataclass
 import re
 
-from flaky_agent.runner import RunResult
+from Diagnoser.runner import RunResult
 
 
 _EXCEPTION_RE = re.compile(r"\b([A-Za-z_]\w*(?:Error|Exception))(?::|\s|$)")
