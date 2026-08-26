@@ -2,43 +2,13 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict
 import json
 from pathlib import Path
 import re
-from typing import Literal
-
-from Diagnoser.analyzer import AnalysisResult
-from Diagnoser.runner import RunResult
-
-
-DiagnosisType = Literal[
-    "race_condition",
-    "shared_state",
-    "timing_assumption",
-    "test_order_dependency",
-    "external_dependency",
-    "random_seed",
-    "unknown",
-]
+from Diagnoser.schemas import AnalysisResult, Diagnosis, RunResult
 
 _LOCATION_RE = re.compile(r"([\w./\\-]+\.py):(\d+):")
-
-
-@dataclass(frozen=True, slots=True)
-class Diagnosis:
-    """A machine-readable root-cause and fix recommendation."""
-
-    diagnosis_type: DiagnosisType
-    confidence: float
-    target_file: str | None
-    line_number: int | None
-    rationale: str
-    proposed_fix: str
-
-    def to_dict(self) -> dict[str, object]:
-        """Return a JSON-serializable representation for reporting or APIs."""
-        return asdict(self)
 
 
 def build_diagnosis_prompt(

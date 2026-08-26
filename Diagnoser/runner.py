@@ -2,30 +2,12 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from pathlib import Path
 import subprocess
 import sys
 import time
 
-
-@dataclass(frozen=True, slots=True)
-class RunResult:
-    """Evidence captured from one clean pytest process."""
-
-    run_number: int
-    passed: bool
-    return_code: int
-    duration_seconds: float
-    stdout: str
-    stderr: str
-    command: tuple[str, ...]
-
-    @property
-    def output(self) -> str:
-        """Combined pytest output, preserving stderr when it is present."""
-        return f"{self.stdout}\n{self.stderr}".strip()
-
+from Diagnoser.schemas import RunResult
 
 def run_test_repeatedly(
     repo_path: str | Path,

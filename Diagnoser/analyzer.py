@@ -3,33 +3,13 @@
 from __future__ import annotations
 
 from collections import Counter
-from dataclasses import dataclass
 import re
 
-from Diagnoser.runner import RunResult
+from Diagnoser.schemas import AnalysisResult, RunResult
 
 
 _EXCEPTION_RE = re.compile(r"\b([A-Za-z_]\w*(?:Error|Exception))(?::|\s|$)")
 _ASSERTION_RE = re.compile(r"^E\s+(assert .+)$", re.MULTILINE)
-
-
-@dataclass(frozen=True, slots=True)
-class AnalysisResult:
-    """A reproducible summary of patterns found across repeated test runs."""
-
-    total_runs: int
-    passed_runs: int
-    failed_runs: int
-    pass_rate: float
-    failure_signatures: dict[str, int]
-    exception_types: dict[str, int]
-    signals: tuple[str, ...]
-    evidence_markers: tuple[str, ...]
-
-    @property
-    def is_flaky(self) -> bool:
-        """Whether this batch contains both passing and failing executions."""
-        return self.passed_runs > 0 and self.failed_runs > 0
 
 
 def analyze_runs(results: list[RunResult]) -> AnalysisResult:

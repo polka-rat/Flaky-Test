@@ -1,5 +1,5 @@
 from Diagnoser.analyzer import analyze_runs
-from Diagnoser.runner import RunResult
+from Diagnoser.schemas import RunResult
 
 
 def make_result(number: int, passed: bool, output: str = "") -> RunResult:
