@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 import shutil
+import subprocess
 import uuid
 
 from Diagnoser.analyzer import analyze_runs
@@ -38,12 +39,14 @@ def run_agent(
     diagnose: DiagnoseFunction = diagnose_mock,
     report: ProgressReporter = print,
 ) -> AgentResult:
-    """Run the capped diagnose → patch-copy → verify closed loop.
+    """Run the capped diagnose → patch-isolation → verify closed loop.
 
     ``patch_provider`` separates a diagnosis from an executable source edit.
     The future adapter will provide this exact replacement after its
-    structured response has been validated. Every verification is performed in
-    a newly copied repository, never against ``repo_path``.
+    structured response has been validated. A clean Git repository uses one
+    disposable worktree that is reset between attempts. Non-Git or dirty
+    repositories use one copied fallback, with the target file restored from
+    the original before each attempt.
     """
     if max_attempts < 1:
         raise ValueError("max_attempts must be at least 1")
@@ -52,6 +55,9 @@ def run_agent(
     if not repository.is_dir():
         raise NotADirectoryError(f"Repository path does not exist: {repository}")
     run_workspace = _make_work_root(repository, work_root)
+    isolated_repo, workspace_mode = _prepare_isolated_repository(
+        repository, run_workspace, report
+    )
 
     report(f"RUN: executing {test_id} {runs} times in {repository}")
     current_results = run_test_repeatedly(
@@ -73,19 +79,20 @@ def run_agent(
             report("APPLY: no exact patch was supplied; stopping safely.")
             break
 
-        copied_repo = run_workspace / f"attempt-{attempt_number}" / "repo"
-        _copy_repository(repository, copied_repo)
         relative_file = _validated_relative_path(instruction.relative_file)
-        report(f"APPLY: writing a patched copy at {copied_repo / relative_file}")
+        _reset_isolated_repository(
+            workspace_mode, repository, isolated_repo, relative_file
+        )
+        report(f"APPLY: writing a patched copy at {isolated_repo / relative_file}")
         patch_result = apply_replacement_to_copy(
             repository / relative_file,
-            copied_repo / relative_file,
+            isolated_repo / relative_file,
             original_text=instruction.original_text,
             replacement_text=instruction.replacement_text,
         )
         report(f"VERIFY: executing {test_id} {runs} times against the patched copy")
         current_results = run_test_repeatedly(
-            copied_repo, test_id, runs=runs, timeout_seconds=timeout_seconds
+            isolated_repo, test_id, runs=runs, timeout_seconds=timeout_seconds
         )
         post_fix_analysis = analyze_runs(current_results)
         attempts.append(
@@ -103,6 +110,7 @@ def run_agent(
                 tuple(attempts),
                 verified_fixed=True,
                 work_root=run_workspace,
+                workspace_mode=workspace_mode,
             )
 
     report("NOT VERIFIED: no attempt achieved a 100% post-fix pass rate.")
@@ -111,6 +119,7 @@ def run_agent(
         tuple(attempts),
         verified_fixed=False,
         work_root=run_workspace,
+        workspace_mode=workspace_mode,
     )
 
 
@@ -125,6 +134,59 @@ def _make_work_root(repository: Path, work_root: str | Path | None) -> Path:
     destination = base / f"run-{uuid.uuid4().hex}"
     destination.mkdir(parents=True)
     return destination
+
+
+def _prepare_isolated_repository(
+    source: Path, work_root: Path, report: ProgressReporter
+) -> tuple[Path, str]:
+    """Create one reusable worktree when safe, otherwise one copied fallback."""
+    destination = work_root / "repo"
+    if _is_clean_git_repository(source):
+        completed = _run_git(source, "worktree", "add", "--detach", str(destination), "HEAD")
+        if completed.returncode == 0:
+            report(f"ISOLATE: using one disposable Git worktree at {destination}")
+            return destination, "git_worktree"
+        report("ISOLATE: Git worktree creation failed; using the safe copy fallback.")
+    else:
+        report("ISOLATE: source is not a clean Git repository; using one safe copy fallback.")
+    _copy_repository(source, destination)
+    return destination, "copy"
+
+
+def _reset_isolated_repository(
+    mode: str, source: Path, isolated: Path, relative_file: Path
+) -> None:
+    """Restore the reusable isolation area to a baseline before an attempt."""
+    if mode == "git_worktree":
+        # This destructive reset is constrained to our disposable worktree,
+        # never the user's source repository.
+        reset = _run_git(isolated, "reset", "--hard", "HEAD")
+        clean = _run_git(isolated, "clean", "-fd")
+        if reset.returncode != 0 or clean.returncode != 0:
+            raise RuntimeError("could not reset disposable Git worktree to baseline")
+        return
+
+    destination_file = isolated / relative_file
+    destination_file.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source / relative_file, destination_file)
+
+
+def _is_clean_git_repository(repository: Path) -> bool:
+    root = _run_git(repository, "rev-parse", "--show-toplevel")
+    if root.returncode != 0 or Path(root.stdout.strip()).resolve() != repository:
+        return False
+    status = _run_git(repository, "status", "--porcelain")
+    return status.returncode == 0 and not status.stdout.strip()
+
+
+def _run_git(repository: Path, *arguments: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ("git", *arguments),
+        cwd=repository,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
 
 
 def _copy_repository(source: Path, destination: Path) -> None:

@@ -111,3 +111,4 @@ class AgentResult:
     attempts: tuple[AgentAttempt, ...]
     verified_fixed: bool
     work_root: Path
+    workspace_mode: Literal["git_worktree", "copy"]
