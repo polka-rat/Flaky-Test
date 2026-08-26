@@ -82,3 +82,32 @@ class PatchResult:
     source_file: Path
     patched_file: Path
     diff: str
+
+
+@dataclass(frozen=True, slots=True)
+class PatchInstruction:
+    """An exact replacement that can be applied safely by the patcher."""
+
+    relative_file: str
+    original_text: str
+    replacement_text: str
+
+
+@dataclass(frozen=True, slots=True)
+class AgentAttempt:
+    """One diagnose, patch, and post-fix verification cycle."""
+
+    number: int
+    diagnosis: Diagnosis
+    patch_result: PatchResult
+    post_fix_analysis: AnalysisResult
+
+
+@dataclass(frozen=True, slots=True)
+class AgentResult:
+    """Final evidence from the closed-loop agent run."""
+
+    pre_fix_analysis: AnalysisResult
+    attempts: tuple[AgentAttempt, ...]
+    verified_fixed: bool
+    work_root: Path
