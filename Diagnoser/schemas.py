@@ -1,6 +1,5 @@
 """Shared data models passed between Flaky Test Diagnoser components.
 
-Keeping these records together makes the data flow easy to follow:
 runner -> analyzer -> diagnoser -> patcher -> agent.
 """
 
@@ -69,6 +68,8 @@ class Diagnosis:
     line_number: int | None
     rationale: str
     proposed_fix: str
+    original_text: str | None = None
+    replacement_text: str | None = None
 
     def to_dict(self) -> dict[str, object]:
         """Return a JSON-serializable representation for reporting or APIs."""
@@ -112,3 +113,24 @@ class AgentResult:
     verified_fixed: bool
     work_root: Path
     workspace_mode: Literal["git_worktree", "copy"]
+
+
+@dataclass(frozen=True, slots=True)
+class EvaluationCase:
+    """One repository and pytest target included in a batch evaluation."""
+
+    name: str
+    repo_path: Path
+    test_id: str
+
+
+@dataclass(frozen=True, slots=True)
+class EvaluationResult:
+    """Resume-friendly outcome for one evaluated flaky-test case."""
+
+    case_name: str
+    diagnosis_type: str | None
+    confidence: float | None
+    pre_fix_pass_rate: float
+    post_fix_pass_rate: float | None
+    verified_fixed: bool

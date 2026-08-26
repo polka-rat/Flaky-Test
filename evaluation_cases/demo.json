@@ -1,0 +1,9 @@
+{
+  "cases": [
+    {
+      "name": "synthetic-randomness-demo",
+      "repo_path": "../demo_repo",
+      "test_id": "test_flaky_random.py::test_random_value_is_not_a_valid_correctness_signal"
+    }
+  ]
+}

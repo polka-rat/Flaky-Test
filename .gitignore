@@ -1,0 +1,7 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.flaky-agent-work/
+.venv/
+*.egg-info/
+.env

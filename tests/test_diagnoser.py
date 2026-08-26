@@ -2,9 +2,11 @@ from Diagnoser.analyzer import analyze_runs
 from Diagnoser.diagnoser import (
     build_diagnosis_prompt,
     build_mock_patch_instruction,
+    diagnose_with_agent,
     diagnose_mock,
+    patch_instruction_from_diagnosis,
 )
-from Diagnoser.schemas import RunResult
+from Diagnoser.schemas import Diagnosis, RunResult
 
 
 def make_result(number: int, passed: bool, output: str = "") -> RunResult:
@@ -56,3 +58,38 @@ def test_mock_patch_instruction_is_limited_to_the_known_demo_assertion(tmp_path)
     assert instruction is not None
     assert instruction.relative_file == source.name
     assert instruction.replacement_text == "assert secrets.randbelow(2) in (0, 1)"
+
+
+def test_gemini_diagnosis_uses_structured_response_and_returns_exact_patch() -> None:
+    class FakeInteractions:
+        def create(self, **kwargs):
+            self.arguments = kwargs
+            return type("Response", (), {"output_text": """{
+                \"diagnosis_type\": \"timing_assumption\",
+                \"confidence\": 0.8,
+                \"target_file\": \"tests/test_wait.py\",
+                \"line_number\": 11,
+                \"rationale\": \"The run timed out.\",
+                \"proposed_fix\": \"Wait for the event.\",
+                \"original_text\": \"time.sleep(1)\",
+                \"replacement_text\": \"event.wait(timeout=1)\"
+            }"""})()
+
+    class FakeClient:
+        interactions = FakeInteractions()
+
+    results = [make_result(1, False, "tests/test_wait.py:11: TimeoutError")]
+    diagnosis = diagnose_with_agent(results, analyze_runs(results), client=FakeClient())
+
+    assert diagnosis.diagnosis_type == "timing_assumption"
+    assert diagnosis.confidence == 0.8
+    instruction = patch_instruction_from_diagnosis(diagnosis)
+    assert instruction is not None
+    assert instruction.original_text == "time.sleep(1)"
+    assert FakeClient.interactions.arguments["response_format"]["mime_type"] == "application/json"
+
+
+def test_patch_instruction_refuses_diagnosis_without_exact_source() -> None:
+    diagnosis = Diagnosis("unknown", 0.1, "test.py", 1, "insufficient", "inspect first")
+
+    assert patch_instruction_from_diagnosis(diagnosis) is None

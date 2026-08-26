@@ -9,7 +9,7 @@ description = "A closed-loop agent for diagnosing and verifying flaky Python tes
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "anthropic==0.40.0",
+    "google-genai==2.19.0",
 ]
 
 [project.scripts]
